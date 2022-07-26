@@ -1,0 +1,15 @@
+POST http://localhost:8080/patch/infra-test
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "commands": [
+    {
+      "path": "chlubek/git-patcher-prototype/release.yml",
+      "setField": {
+        "field": "spec.values.image.tag",
+        "value": "1.2.3"
+      }
+    }
+  ]
+}

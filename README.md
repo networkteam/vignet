@@ -15,3 +15,7 @@ This is why we created _Vignet_:
 * It integrates flexible authorization via OPA rules to decide if a command should be allowed
 * Easy to integrate into GitLab and other services
 * Works with Flux, ArgoCD or other GitOps tools
+
+## Design principles
+
+* Vignet is stateless, repositories and authorization are configured via configuration files

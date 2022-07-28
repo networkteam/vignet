@@ -79,7 +79,7 @@ func main() {
 			return fmt.Errorf("building authorizer: %w", err)
 		}
 
-		h := vignet.NewHandler(authenticationProvider, authorizer)
+		h := vignet.NewHandler(authenticationProvider, authorizer, config.Repositories)
 
 		// TODO Add graceful shutdown
 		log.Infof("Starting HTTP server on %s", c.String("address"))

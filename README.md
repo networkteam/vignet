@@ -12,7 +12,7 @@ This is why we created _Vignet_:
 * It runs as a standalone service in your infrastructure
 * It has access to infrastructure repositories
 * It exposes an authenticated API for patching declarations via commands
-* It integrates flexible authorization via OPA rules to decide if a command should be allowed
+* It integrates flexible authorization via OPA (Open Policy Agent) rules to decide if a command should be allowed
 * Easy to integrate into GitLab and other services
 * Works with Flux, ArgoCD or other GitOps tools
 

@@ -11,6 +11,7 @@ require (
 	github.com/gofrs/uuid v4.0.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.4.2
 	github.com/lestrrat-go/jwx/v2 v2.0.4
+	github.com/mattn/go-isatty v0.0.14
 	github.com/open-policy-agent/opa v0.42.2
 	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli/v2 v2.11.1
@@ -31,6 +32,7 @@ require (
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
+	github.com/go-logfmt/logfmt v0.5.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.20.0 // indirect
 	github.com/go-openapi/swag v0.21.1 // indirect

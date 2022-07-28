@@ -7,12 +7,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-git/go-billy/v5"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/memory"
@@ -22,8 +24,8 @@ import (
 type Handler struct {
 	mux http.Handler
 
-	authorizer         Authorizer
-	repositoriesConfig RepositoriesConfig
+	authorizer Authorizer
+	config     Config
 }
 
 var _ http.Handler = &Handler{}
@@ -31,11 +33,11 @@ var _ http.Handler = &Handler{}
 func NewHandler(
 	authenticationProvider AuthenticationProvider,
 	authorizer Authorizer,
-	repositoriesConfig RepositoriesConfig,
+	config Config,
 ) *Handler {
 	h := &Handler{
-		authorizer:         authorizer,
-		repositoriesConfig: repositoriesConfig,
+		authorizer: authorizer,
+		config:     config,
 	}
 
 	r := chi.NewRouter()
@@ -53,7 +55,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type patchRequest struct {
+	Commit struct {
+		Message   string        `json:"message"`
+		Committer *objSignature `json:"committer"`
+		Author    *objSignature `json:"author"`
+	} `json:"commit"`
 	Commands []patchRequestCommand `json:"commands"`
+}
+
+type objSignature struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
 
 type patchRequestCommand struct {
@@ -88,7 +100,7 @@ func (h *Handler) patch(w http.ResponseWriter, r *http.Request) {
 
 	repoName := chi.URLParam(r, "repo")
 	var repoConfig RepositoryConfig
-	if c, exists := h.repositoriesConfig[repoName]; !exists {
+	if c, exists := h.config.Repositories[repoName]; !exists {
 		log.WithField("repo", repoName).Warn("Unknown repository")
 		http.Error(w, fmt.Sprintf("Unknown repository: %q", repoName), http.StatusNotFound)
 		return
@@ -125,6 +137,7 @@ func (h *Handler) patch(w http.ResponseWriter, r *http.Request) {
 		WithField("authCtx", authCtx.GitLabClaims).
 		Debugf("Will patch %s with %+v", repoName, req)
 
+	// TODO Extract handling of command to separate type
 	err := h.gitClonePatchCommitPush(ctx, repoName, repoConfig, req)
 	if err != nil {
 		log.
@@ -151,7 +164,7 @@ func (h *Handler) gitClonePatchCommitPush(ctx context.Context, repoName string, 
 	r, err := git.Clone(storer, fs, &git.CloneOptions{
 		URL:  repoConfig.URL,
 		Auth: authMethod,
-		// FIXME Git mock server doesn't support shallow clone (`unsupported capability: shallow`)
+		// FIXME Current Git mock server setup doesn't support shallow clone (`unsupported capability: shallow`)
 		// Depth: 1,
 	})
 	if err != nil {
@@ -180,10 +193,47 @@ func (h *Handler) gitClonePatchCommitPush(ctx context.Context, repoName string, 
 		}
 	}
 
-	// TODO Get commit message from patch request
-	_, err = w.Commit("Performed patch", &git.CommitOptions{
-		// TODO Set author when running headless
-		// Author: ,
+	commitMessage := "Automated patch by vignet"
+	if req.Commit.Message != "" {
+		commitMessage = req.Commit.Message
+	}
+	var (
+		commitAuthor    *object.Signature
+		commitCommitter *object.Signature
+	)
+	if req.Commit.Author != nil {
+		commitAuthor = &object.Signature{
+			Name:  req.Commit.Author.Name,
+			Email: req.Commit.Author.Email,
+			When:  time.Now(),
+		}
+	} else {
+		commitAuthor = &object.Signature{
+			Name:  h.config.Commit.DefaultAuthor.Name,
+			Email: h.config.Commit.DefaultAuthor.Email,
+			When:  time.Now(),
+		}
+	}
+	if req.Commit.Committer != nil {
+		commitCommitter = &object.Signature{
+			Name:  req.Commit.Committer.Name,
+			Email: req.Commit.Committer.Email,
+			When:  time.Now(),
+		}
+	} else {
+		authCtx := authCtxFromCtx(ctx)
+		if authCtx.GitLabClaims != nil {
+			commitCommitter = &object.Signature{
+				Name:  authCtx.GitLabClaims.UserLogin,
+				Email: authCtx.GitLabClaims.UserEmail,
+				When:  time.Now(),
+			}
+		}
+	}
+
+	_, err = w.Commit(commitMessage, &git.CommitOptions{
+		Author:    commitAuthor,
+		Committer: commitCommitter,
 	})
 	if err != nil {
 		return fmt.Errorf("creating commit: %w", err)

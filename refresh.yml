@@ -5,7 +5,7 @@ build_flags: []
 build_path: ./tmp
 build_target_path: "./cmd"
 command_env: []
-command_flags: []
+command_flags: ['--verbose']
 enable_colors: true
 ignored_folders:
 - vendor

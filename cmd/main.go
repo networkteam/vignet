@@ -7,6 +7,9 @@ import (
 	"os"
 
 	"github.com/apex/log"
+	"github.com/apex/log/handlers/logfmt"
+	"github.com/apex/log/handlers/text"
+	"github.com/mattn/go-isatty"
 	"github.com/open-policy-agent/opa/bundle"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
@@ -27,43 +30,45 @@ func main() {
 	app.Usage = "The missing GitOps piece: expose Git repositories for automation via an authenticated HTTP API"
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
-			Name:  "address",
-			Value: ":8080",
-			Usage: "Address for HTTP server to listen on",
+			Name:    "address",
+			Value:   ":8080",
+			Usage:   "Address for HTTP server to listen on",
+			EnvVars: []string{"VIGNET_ADDRESS"},
 		},
 		&cli.PathFlag{
 			Name:    "config",
 			Aliases: []string{"c"},
 			Usage:   "Path to the configuration file",
 			Value:   "config.yaml",
+			EnvVars: []string{"VIGNET_CONFIG"},
 		},
 		&cli.PathFlag{
-			Name:  "policy",
-			Usage: "Path to an OPA policy bundle path, use the built-in by default",
+			Name:    "policy",
+			Usage:   "Path to an OPA policy bundle path, uses the built-in by default",
+			EnvVars: []string{"VIGNET_POLICY"},
+		},
+		&cli.BoolFlag{
+			Name:    "verbose",
+			Usage:   "Enable verbose logging",
+			EnvVars: []string{"VIGNET_VERBOSE"},
+		},
+		&cli.BoolFlag{
+			Name:    "force-logfmt",
+			Usage:   "Force logging to use logfmt",
+			EnvVars: []string{"VIGNET_FORCE_LOGFMT"},
 		},
 	}
 	app.Before = func(c *cli.Context) error {
-		// TODO Add configurable log level
-		log.SetLevel(log.DebugLevel)
-
-		configFile, err := os.Open(c.Path("config"))
-		if err != nil {
-			return fmt.Errorf("opening config file: %w", err)
+		if c.Bool("verbose") {
+			log.SetLevel(log.DebugLevel)
 		}
-		defer configFile.Close()
+		setServerLogHandler(c)
 
-		var config vignet.Config
-		err = yaml.NewDecoder(configFile).Decode(&config)
+		config, err := loadConfig(c.Path("config"))
 		if err != nil {
-			return fmt.Errorf("decoding config file: %w", err)
+			return err
 		}
-		err = config.Validate()
-		if err != nil {
-			return fmt.Errorf("validating config file: %w", err)
-		}
-
 		c.Context = context.WithValue(c.Context, ctxKeyConfig, config)
-
 		return nil
 	}
 	app.Action = func(c *cli.Context) error {
@@ -73,16 +78,24 @@ func main() {
 		if err != nil {
 			return fmt.Errorf("building authentication provider: %w", err)
 		}
+		switch config.AuthenticationProvider.Type {
+		case vignet.AuthenticationProviderGitLab:
+			log.
+				WithField("gitlabUrl", config.AuthenticationProvider.GitLab.URL).
+				Infof("Using GitLab authentication provider")
+		default:
+			log.Infof("Using authentication provider %s", config.AuthenticationProvider.Type)
+		}
 
 		authorizer, err := buildAuthorizer(c)
 		if err != nil {
 			return fmt.Errorf("building authorizer: %w", err)
 		}
 
-		h := vignet.NewHandler(authenticationProvider, authorizer, config.Repositories)
+		h := vignet.NewHandler(authenticationProvider, authorizer, config)
 
 		// TODO Add graceful shutdown
-		log.Infof("Starting HTTP server on %s", c.String("address"))
+		log.WithField("address", c.String("address")).Infof("Starting HTTP server")
 		err = http.ListenAndServe(c.String("address"), h)
 		if err != nil {
 			return fmt.Errorf("starting server: %w", err)
@@ -99,6 +112,25 @@ func main() {
 	}
 }
 
+func loadConfig(configFilename string) (vignet.Config, error) {
+	configFile, err := os.Open(configFilename)
+	if err != nil {
+		return vignet.Config{}, fmt.Errorf("opening config file: %w", err)
+	}
+	defer configFile.Close()
+
+	config := vignet.DefaultConfig
+	err = yaml.NewDecoder(configFile).Decode(&config)
+	if err != nil {
+		return vignet.Config{}, fmt.Errorf("decoding config file: %w", err)
+	}
+	err = config.Validate()
+	if err != nil {
+		return vignet.Config{}, fmt.Errorf("validating config file: %w", err)
+	}
+	return config, nil
+}
+
 func buildAuthorizer(c *cli.Context) (vignet.Authorizer, error) {
 	var (
 		b   *bundle.Bundle
@@ -107,14 +139,29 @@ func buildAuthorizer(c *cli.Context) (vignet.Authorizer, error) {
 
 	if c.IsSet("policy") {
 		policyPath := c.Path("policy")
-		log.Infof("Loading policy bundle from %s", policyPath)
 		b, err = policy.LoadBundle(policyPath)
+		if err != nil {
+			return nil, fmt.Errorf("loading policy bundle: %w", err)
+		}
+		log.
+			WithField("policyPath", policyPath).
+			Infof("Loaded policy bundle")
 	} else {
 		b, err = policy.LoadDefaultBundle()
 		if err != nil {
 			return nil, fmt.Errorf("loading default bundle: %w", err)
 		}
+		log.Infof("Loaded default policy bundle")
 	}
 
 	return vignet.NewRegoAuthorizer(c.Context, b)
+}
+
+func setServerLogHandler(c *cli.Context) {
+	isTerminal := isatty.IsTerminal(os.Stdout.Fd())
+	if c.Bool("force-logfmt") || !isTerminal {
+		log.SetHandler(logfmt.New(os.Stderr))
+	} else {
+		log.SetHandler(text.New(os.Stderr))
+	}
 }

@@ -55,12 +55,14 @@ func TestEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 
 	// - Create handler
-	handler := vignet.NewHandler(authProvider, authorizer, vignet.RepositoriesConfig{
-		"e2e-test": {
-			URL: gitSrv.URL,
-			BasicAuth: &vignet.BasicAuthConfig{
-				Username: "j.doe",
-				Password: "not-a-secret",
+	handler := vignet.NewHandler(authProvider, authorizer, vignet.Config{
+		Repositories: vignet.RepositoriesConfig{
+			"e2e-test": {
+				URL: gitSrv.URL,
+				BasicAuth: &vignet.BasicAuthConfig{
+					Username: "j.doe",
+					Password: "not-a-secret",
+				},
 			},
 		},
 	})

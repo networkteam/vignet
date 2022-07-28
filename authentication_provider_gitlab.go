@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	url2 "net/url"
+	netUrl "net/url"
 	"strings"
 
 	"github.com/MicahParks/keyfunc"
@@ -22,7 +22,7 @@ var _ AuthenticationProvider = &GitLabAuthenticationProvider{}
 // It takes the GitLab instance URL as an argument.
 // The context is used to cancel the refreshing of keys.
 func NewGitLabAuthenticationProvider(ctx context.Context, url string) (*GitLabAuthenticationProvider, error) {
-	parsedURL, err := url2.Parse(url)
+	parsedURL, err := netUrl.Parse(url)
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL: %w", err)
 	}

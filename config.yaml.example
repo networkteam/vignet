@@ -1,0 +1,28 @@
+authenticationProvider:
+  # Use a GitLab job token authentication provider
+  type: gitlab
+
+  # Configuration for the GitLab authentication provider
+  gitlab:
+    # URL to the GitLab instance
+    url: https://gitlab.example.com
+
+# Configure repositories that can be accessed by vignet
+repositories:
+  # Repository name
+  my-project:
+    # URL to the repository
+    url: https://gitlab.example.com/my-group/my-project.git
+    basicAuth:
+      # Username doesn't matter for GitLab
+      username: gitlab
+      # Use an access token with scopes "read_repository", "write_repository"
+      password: an-access-token
+
+commit:
+  # Default message to use for a commit if none is specified in a request
+  defaultMessage: "Automated update"
+  # Default author to use for a commit if none is specified in a request
+  defaultAuthor:
+    name: Git autopilot
+    email: bot@example.com

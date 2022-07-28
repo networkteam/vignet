@@ -78,8 +78,8 @@ type patchRequestCommand struct {
 type setFieldPatchRequestCommand struct {
 	// Field path to set (dot separated)
 	Field string `json:"field"`
-	// Value to set (as YAML string)
-	Value string `json:"value"`
+	// Value to set
+	Value any `json:"value"`
 }
 
 func (h *Handler) patch(w http.ResponseWriter, r *http.Request) {
@@ -90,6 +90,8 @@ func (h *Handler) patch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Invalid JSON in body: %v", err), http.StatusBadRequest)
 		return
 	}
+
+	// TODO Validate patchRequest (e.g. non-empty commands)
 
 	ctx := r.Context()
 	authCtx := authCtxFromCtx(ctx)
@@ -164,8 +166,6 @@ func (h *Handler) gitClonePatchCommitPush(ctx context.Context, repoName string, 
 	r, err := git.Clone(storer, fs, &git.CloneOptions{
 		URL:  repoConfig.URL,
 		Auth: authMethod,
-		// FIXME Current Git mock server setup doesn't support shallow clone (`unsupported capability: shallow`)
-		// Depth: 1,
 	})
 	if err != nil {
 		return fmt.Errorf("cloning repository: %w", err)
@@ -193,7 +193,30 @@ func (h *Handler) gitClonePatchCommitPush(ctx context.Context, repoName string, 
 		}
 	}
 
-	commitMessage := "Automated patch by vignet"
+	commitMessage, commitOptions := h.buildCommitMsgAndOptions(ctx, req)
+	_, err = w.Commit(commitMessage, commitOptions)
+	if err != nil {
+		return fmt.Errorf("creating commit: %w", err)
+	}
+
+	err = r.Push(&git.PushOptions{
+		RemoteName: "origin",
+		Auth:       authMethod,
+	})
+	if err != nil {
+		return fmt.Errorf("pushing to repository: %w", err)
+	}
+
+	log.
+		WithField("repoName", repoName).
+		WithField("repoUrl", repoConfig.URL).
+		Info("Pushed commit to repository")
+
+	return nil
+}
+
+func (h *Handler) buildCommitMsgAndOptions(ctx context.Context, req patchRequest) (string, *git.CommitOptions) {
+	commitMessage := h.config.Commit.DefaultMessage
 	if req.Commit.Message != "" {
 		commitMessage = req.Commit.Message
 	}
@@ -231,28 +254,11 @@ func (h *Handler) gitClonePatchCommitPush(ctx context.Context, repoName string, 
 		}
 	}
 
-	_, err = w.Commit(commitMessage, &git.CommitOptions{
+	commitOptions := &git.CommitOptions{
 		Author:    commitAuthor,
 		Committer: commitCommitter,
-	})
-	if err != nil {
-		return fmt.Errorf("creating commit: %w", err)
 	}
-
-	err = r.Push(&git.PushOptions{
-		RemoteName: "origin",
-		Auth:       authMethod,
-	})
-	if err != nil {
-		return fmt.Errorf("pushing to repository: %w", err)
-	}
-
-	log.
-		WithField("repoName", repoName).
-		WithField("repoUrl", repoConfig.URL).
-		Info("Pushed commit to repository")
-
-	return nil
+	return commitMessage, commitOptions
 }
 
 func (h *Handler) applyPatchCommand(ctx context.Context, fs billy.Filesystem, cmd patchRequestCommand) error {
@@ -290,7 +296,12 @@ func (h *Handler) applyPatchCommand(ctx context.Context, fs billy.Filesystem, cm
 				yaml.Set(yaml.NewStringRNode("1.2.3")),
 			)
 		*/
-		err = res.SetMapField(yaml.NewStringRNode(cmd.SetField.Value), strings.Split(cmd.SetField.Field, ".")...)
+
+		valueNode, err := convertMixedJsonValueToRNode(cmd.SetField.Value)
+		if err != nil {
+			return fmt.Errorf("converting value to YAML node: %w", err)
+		}
+		err = res.SetMapField(valueNode, strings.Split(cmd.SetField.Field, ".")...)
 		if err != nil {
 			return fmt.Errorf("setting field: %w", err)
 		}
@@ -325,4 +336,16 @@ func (h *Handler) applyPatchCommand(ctx context.Context, fs billy.Filesystem, cm
 		Info("Patched YAML")
 
 	return nil
+}
+
+func convertMixedJsonValueToRNode(value any) (*yaml.RNode, error) {
+	yml, err := yaml.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	node, err := yaml.Parse(string(yml))
+	if err != nil {
+		return nil, err
+	}
+	return node, nil
 }

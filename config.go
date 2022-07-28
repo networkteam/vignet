@@ -25,6 +25,7 @@ type Config struct {
 // DefaultConfig is the default configuration that will be overwritten by the configuration file.
 var DefaultConfig = Config{
 	Commit: commitConfig{
+		DefaultMessage: "Automated patch by vignet",
 		DefaultAuthor: signatureConfig{
 			Name:  "vignet",
 			Email: "bot@vignet",
@@ -74,7 +75,8 @@ func (c signatureConfig) Valid() error {
 }
 
 type commitConfig struct {
-	DefaultAuthor signatureConfig `yaml:"defaultAuthor"`
+	DefaultMessage string          `yaml:"defaultMessage"`
+	DefaultAuthor  signatureConfig `yaml:"defaultAuthor"`
 }
 
 type AuthenticationProviderType string

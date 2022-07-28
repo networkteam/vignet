@@ -3,12 +3,15 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
+  "commit": {
+    "message": "Bump image to 1.2.5"
+  },
   "commands": [
     {
       "path": "chlubek/git-patcher-prototype/release.yml",
       "setField": {
         "field": "spec.values.image.tag",
-        "value": "1.2.3"
+        "value": "1.2.5"
       }
     }
   ]

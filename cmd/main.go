@@ -30,32 +30,37 @@ func main() {
 	app.Usage = "The missing GitOps piece: expose Git repositories for automation via an authenticated HTTP API"
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
-			Name:    "address",
-			Value:   ":8080",
-			Usage:   "Address for HTTP server to listen on",
-			EnvVars: []string{"VIGNET_ADDRESS"},
+			Name:     "address",
+			Category: "http",
+			Value:    ":8080",
+			Usage:    "Address for HTTP server to listen on",
+			EnvVars:  []string{"VIGNET_ADDRESS"},
 		},
 		&cli.PathFlag{
-			Name:    "config",
-			Aliases: []string{"c"},
-			Usage:   "Path to the configuration file",
-			Value:   "config.yaml",
-			EnvVars: []string{"VIGNET_CONFIG"},
+			Name:     "config",
+			Category: "configuration",
+			Aliases:  []string{"c"},
+			Usage:    "Path to the configuration file",
+			Value:    "config.yaml",
+			EnvVars:  []string{"VIGNET_CONFIG"},
 		},
 		&cli.PathFlag{
-			Name:    "policy",
-			Usage:   "Path to an OPA policy bundle path, uses the built-in by default",
-			EnvVars: []string{"VIGNET_POLICY"},
+			Name:     "policy",
+			Category: "authorization",
+			Usage:    "Path to an OPA policy bundle path, uses the built-in by default",
+			EnvVars:  []string{"VIGNET_POLICY"},
 		},
 		&cli.BoolFlag{
-			Name:    "verbose",
-			Usage:   "Enable verbose logging",
-			EnvVars: []string{"VIGNET_VERBOSE"},
+			Name:     "verbose",
+			Category: "logging",
+			Usage:    "Enable verbose logging",
+			EnvVars:  []string{"VIGNET_VERBOSE"},
 		},
 		&cli.BoolFlag{
-			Name:    "force-logfmt",
-			Usage:   "Force logging to use logfmt",
-			EnvVars: []string{"VIGNET_FORCE_LOGFMT"},
+			Name:     "force-logfmt",
+			Category: "logging",
+			Usage:    "Force logging to use logfmt",
+			EnvVars:  []string{"VIGNET_FORCE_LOGFMT"},
 		},
 	}
 	app.Before = func(c *cli.Context) error {
@@ -71,6 +76,7 @@ func main() {
 		c.Context = context.WithValue(c.Context, ctxKeyConfig, config)
 		return nil
 	}
+	app.Description = "The default command starts an HTTP server that handles commands."
 	app.Action = func(c *cli.Context) error {
 		config := c.Context.Value(ctxKeyConfig).(vignet.Config)
 

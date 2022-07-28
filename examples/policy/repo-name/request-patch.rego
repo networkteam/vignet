@@ -1,8 +1,7 @@
 package vignet.request.patch
 import future.keywords
 
-default allow := false
-
-allow if {
-	input.repo == "infra-test"
+violations contains msg if {
+	input.repo != "infra-test"
+    msg := "repo must be infra-test"
 }

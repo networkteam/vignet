@@ -90,8 +90,10 @@ func generateJwkSet(t *testing.T) jwk.Set {
 	key, err := jwk.FromRaw(v)
 	require.NoError(t, err)
 
-	key.Set(jwk.AlgorithmKey, "RS256")
-	key.Set(jwk.KeyUsageKey, "sig")
+	err = key.Set(jwk.AlgorithmKey, "RS256")
+	require.NoError(t, err)
+	err = key.Set(jwk.KeyUsageKey, "sig")
+	require.NoError(t, err)
 	kid := uuid.Must(uuid.NewV4())
 	err = key.Set(jwk.KeyIDKey, kid.String())
 	require.NoError(t, err)

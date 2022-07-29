@@ -76,7 +76,7 @@ func main() {
 		c.Context = context.WithValue(c.Context, ctxKeyConfig, config)
 		return nil
 	}
-	app.Description = "The default command starts an HTTP server that handles commands."
+	app.Description = "The default command starts the HTTP server that handles commands."
 	app.Action = func(c *cli.Context) error {
 		config := c.Context.Value(ctxKeyConfig).(vignet.Config)
 

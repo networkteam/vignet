@@ -65,6 +65,9 @@ func TestEndToEnd(t *testing.T) {
 				},
 			},
 		},
+		Commit: vignet.CommitConfig{
+			DefaultMessage: "Bumped release",
+		},
 	})
 
 	// --- Build patch request
@@ -93,6 +96,7 @@ func TestEndToEnd(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	// --- Assert Git repository contains change
+	assertGitRepoHeadCommit(t, fs, "Bumped release")
 	assertGitRepoContains(t, fs, map[string][]byte{
 		"my-group/my-project/release.yml": []byte(`foo: bar
 spec:
@@ -103,8 +107,29 @@ spec:
 	})
 }
 
-func assertGitRepoContains(t *testing.T, fs billy.Filesystem, expectedFiles map[string][]byte) {
+func assertGitRepoHeadCommit(t *testing.T, fs billy.Filesystem, expectedMessage string) {
+	t.Helper()
+
 	storer := filesystem.NewStorage(fs, cache.NewObjectLRUDefault())
+	defer storer.Close()
+
+	repo, err := git.Open(storer, nil)
+	require.NoError(t, err)
+
+	head, err := repo.Head()
+	require.NoError(t, err)
+
+	commit, err := repo.CommitObject(head.Hash())
+	require.NoError(t, err)
+
+	require.Equal(t, expectedMessage, commit.Message)
+}
+
+func assertGitRepoContains(t *testing.T, fs billy.Filesystem, expectedFiles map[string][]byte) {
+	t.Helper()
+
+	storer := filesystem.NewStorage(fs, cache.NewObjectLRUDefault())
+	defer storer.Close()
 	workdirFS := memfs.New()
 	repo, err := git.Open(storer, workdirFS)
 	require.NoError(t, err)
@@ -132,7 +157,11 @@ func assertGitRepoContains(t *testing.T, fs billy.Filesystem, expectedFiles map[
 }
 
 func initGitRepo(t *testing.T, fs billy.Filesystem, initialFiles map[string][]byte) {
+	t.Helper()
+
 	storer := filesystem.NewStorage(fs, cache.NewObjectLRUDefault())
+	defer storer.Close()
+
 	workdirFS := memfs.New()
 	repo, err := git.Init(storer, workdirFS)
 	require.NoError(t, err)

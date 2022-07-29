@@ -19,14 +19,14 @@ type Config struct {
 	Repositories RepositoriesConfig `yaml:"repositories"`
 
 	// Commit configures commit options when creating a new commit.
-	Commit commitConfig `yaml:"commit"`
+	Commit CommitConfig `yaml:"commit"`
 }
 
 // DefaultConfig is the default configuration that will be overwritten by the configuration file.
 var DefaultConfig = Config{
-	Commit: commitConfig{
+	Commit: CommitConfig{
 		DefaultMessage: "Automated patch by vignet",
-		DefaultAuthor: signatureConfig{
+		DefaultAuthor: SignatureConfig{
 			Name:  "vignet",
 			Email: "bot@vignet",
 		},
@@ -59,12 +59,12 @@ type BasicAuthConfig struct {
 	Password string `yaml:"password"`
 }
 
-type signatureConfig struct {
+type SignatureConfig struct {
 	Name  string `yaml:"name"`
 	Email string `yaml:"email"`
 }
 
-func (c signatureConfig) Valid() error {
+func (c SignatureConfig) Valid() error {
 	if c.Name == "" {
 		return fmt.Errorf("name required")
 	}
@@ -74,9 +74,9 @@ func (c signatureConfig) Valid() error {
 	return nil
 }
 
-type commitConfig struct {
+type CommitConfig struct {
 	DefaultMessage string          `yaml:"defaultMessage"`
-	DefaultAuthor  signatureConfig `yaml:"defaultAuthor"`
+	DefaultAuthor  SignatureConfig `yaml:"defaultAuthor"`
 }
 
 type AuthenticationProviderType string

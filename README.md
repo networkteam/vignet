@@ -23,7 +23,9 @@ This is why we created _Vignet_:
 ## Current state
 
 It is in the early stages of development, but it should already be usable for
-integration in GitLab CI. Use in production at your own risk.
+integration in GitLab CI.
+Configuration and API is subject to change.
+Use in production at your own risk.
 
 ## Command reference
 

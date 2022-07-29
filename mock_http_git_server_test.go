@@ -80,6 +80,7 @@ func (m *mockHttpGitServer) httpInfoRefs(rw http.ResponseWriter, r *http.Request
 			return
 		}
 	}
+	defer sess.Close()
 
 	ar, err := sess.AdvertisedReferencesContext(r.Context())
 	if err != nil {
@@ -124,12 +125,15 @@ func (m *mockHttpGitServer) httpGitUploadPack(rw http.ResponseWriter, r *http.Re
 		log.WithError(err).Error("Failed to create upload pack session")
 		return
 	}
+	defer sess.Close()
+
 	res, err := sess.UploadPack(r.Context(), upr)
 	if err != nil {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		log.WithError(err).Error("Failed to upload pack")
 		return
 	}
+	defer res.Close()
 
 	err = res.Encode(rw)
 	if err != nil {
@@ -159,12 +163,15 @@ func (m *mockHttpGitServer) httpGitReceivePack(rw http.ResponseWriter, r *http.R
 		log.WithError(err).Error("Failed to create endpoint")
 		return
 	}
+
 	sess, err := m.srv.NewReceivePackSession(ep, nil)
 	if err != nil {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)
 		log.WithError(err).Error("Failed to create receive pack session")
 		return
 	}
+	defer sess.Close()
+
 	res, err := sess.ReceivePack(r.Context(), upr)
 	if err != nil {
 		http.Error(rw, "Internal server error", http.StatusInternalServerError)

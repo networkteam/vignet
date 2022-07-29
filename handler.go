@@ -176,7 +176,6 @@ func (h *Handler) gitClonePatchCommitPush(ctx context.Context, repoName string, 
 		Info("Cloned repository")
 
 	w, err := r.Worktree()
-	_ = w
 	if err != nil {
 		return fmt.Errorf("getting worktree for repository: %w", err)
 	}

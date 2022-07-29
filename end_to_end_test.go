@@ -7,11 +7,13 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-git/go-billy/v5"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/cache"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/filesystem"
 	"github.com/stretchr/testify/require"
@@ -187,6 +189,12 @@ func initGitRepo(t *testing.T, fs billy.Filesystem, initialFiles map[string][]by
 		require.NoError(t, err)
 	}
 
-	_, err = w.Commit("Initial commit", &git.CommitOptions{})
+	_, err = w.Commit("Initial commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "vignet",
+			Email: "test@vignet",
+			When:  time.Now(),
+		},
+	})
 	require.NoError(t, err)
 }

@@ -52,6 +52,7 @@ func main() {
 		},
 		&cli.BoolFlag{
 			Name:     "verbose",
+			Aliases:  []string{"v"},
 			Category: "logging",
 			Usage:    "Enable verbose logging",
 			EnvVars:  []string{"VIGNET_VERBOSE"},
@@ -114,7 +115,8 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Fatalf("Error: %v", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 }
 

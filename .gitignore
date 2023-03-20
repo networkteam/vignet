@@ -14,6 +14,9 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
+# asdf tool versions
+.tool-versions
+
 /config.yaml
 /examples/http-client.private.env.json
 

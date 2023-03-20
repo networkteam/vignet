@@ -2,7 +2,7 @@ package vignet_test
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -149,7 +149,7 @@ func assertGitRepoContains(t *testing.T, fs billy.Filesystem, expectedFiles map[
 	for path, content := range expectedFiles {
 		f, err := workdirFS.Open(path)
 		require.NoError(t, err)
-		b, _ := ioutil.ReadAll(f)
+		b, _ := io.ReadAll(f)
 		require.NoError(t, err)
 		f.Close()
 

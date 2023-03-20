@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -271,7 +271,7 @@ func (h *Handler) applyPatchCommand(ctx context.Context, fs billy.Filesystem, cm
 		}
 		defer f.Close()
 
-		in, err = ioutil.ReadAll(f)
+		in, err = io.ReadAll(f)
 		if err != nil {
 			return fmt.Errorf("reading file: %w", err)
 		}

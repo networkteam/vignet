@@ -10,15 +10,16 @@ Since a Git repo can store the complete infrastructure, updates should be protec
 This is why we created _Vignet_:
 
 * It runs as a standalone service in your infrastructure
-* It has access to infrastructure repositories
+* It will get access to your GitOps repositories
 * It exposes an authenticated Rest API for patching YAML declarations via commands
 * It integrates flexible authorization via OPA (Open Policy Agent) rules to decide if a command should be allowed
-* It is easy to integrate into GitLab CI, GitHub Actions and other automation tools
+* It is easy to integrate into GitLab CI, GitHub Actions and other systems
 * Works perfectly with Flux, ArgoCD or other GitOps tools
 
 ## Design principles
 
 * Vignet is stateless, repositories and authorization are configured via configuration files
+* Policies are customizable via Open Policy Agent (OPA) rules
 
 ## Current state
 
@@ -44,16 +45,16 @@ COMMANDS:
 
 GLOBAL OPTIONS:
    --help, -h  show help (default: false)
-   
+
    authorization
    --policy value  Path to an OPA policy bundle path, uses the built-in by default [$VIGNET_POLICY]
-   
+
    configuration
    --config value, -c value  Path to the configuration file (default: "config.yaml") [$VIGNET_CONFIG]
-   
+
    http
    --address value  Address for HTTP server to listen on (default: ":8080") [$VIGNET_ADDRESS]
-   
+
    logging
    --force-logfmt  Force logging to use logfmt (default: false) [$VIGNET_FORCE_LOGFMT]
    --verbose       Enable verbose logging (default: false) [$VIGNET_VERBOSE]
@@ -104,7 +105,7 @@ commit:
 ### POST `/patch/{repository}`
 
 Pulls the repository, patches files according to commands, creates a commit and pushes to the repository.
- 
+
 Responds with status code 200 on success.
 
 #### Body
@@ -161,22 +162,22 @@ Vignet will pass the authentication context and request information to the polic
 
 ### Default policy
 
-#### Patch request 
+#### Patch request
 
 * `path` Accepts only `.yml` and `.yaml` files
 
-The further policy behaviour depends on the authentication provider:
+The further policy behavior depends on the authentication provider:
 
 #### GitLab
 
 * `path` Requires a prefix of the GitLab project path (of the job passing the job token).
- 
+
   E.g. a job token with `project_path: "my-group/my-project"` will only authorize requests for `my-group/my-project/**/*.{yml,yaml}`.
 
 ## Known limitations
 
 * Currently, only authentication via a GitLab job token is supported
-* There is only a set field command for now
+* There is only a `setField` command for now
 
 ## License
 

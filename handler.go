@@ -18,6 +18,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/memory"
+	"github.com/networkteam/apexlogutils/httplog"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
@@ -41,9 +42,20 @@ func NewHandler(
 	}
 
 	r := chi.NewRouter()
-	r.Use(AuthenticateRequest(authenticationProvider))
 
-	r.Post("/patch/{repo}", h.patch)
+	r.Use(
+		httpLogger,
+	)
+
+	r.Group(func(r chi.Router) {
+		r.Use(AuthenticateRequest(authenticationProvider))
+
+		r.Post("/patch/{repo}", h.patch)
+	})
+
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 
 	h.mux = r
 
@@ -347,4 +359,8 @@ func convertMixedJsonValueToRNode(value any) (*yaml.RNode, error) {
 		return nil, err
 	}
 	return node, nil
+}
+
+func httpLogger(h http.Handler) http.Handler {
+	return httplog.New(h, httplog.ExcludePathPrefix("/healthz"))
 }

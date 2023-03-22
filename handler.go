@@ -155,9 +155,10 @@ func (h *Handler) patch(w http.ResponseWriter, r *http.Request) {
 	err := h.gitClonePatchCommitPush(ctx, repoName, repoConfig, req)
 	if err != nil {
 		log.
+			WithField("repo", repoName).
 			WithError(err).
 			Error("Failed to apply patch command to repository")
-		http.Error(w, "Patch command failed", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Patch command failed:\n\n%v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -205,7 +206,7 @@ func (h *Handler) gitClonePatchCommitPush(ctx context.Context, repoName string, 
 	}
 
 	commitMessage, commitOptions := h.buildCommitMsgAndOptions(ctx, req)
-	_, err = w.Commit(commitMessage, commitOptions)
+	commitHash, err := w.Commit(commitMessage, commitOptions)
 	if err != nil {
 		return fmt.Errorf("creating commit: %w", err)
 	}
@@ -221,6 +222,7 @@ func (h *Handler) gitClonePatchCommitPush(ctx context.Context, repoName string, 
 	log.
 		WithField("repoName", repoName).
 		WithField("repoUrl", repoConfig.URL).
+		WithField("commitHash", commitHash).
 		Info("Pushed commit to repository")
 
 	return nil

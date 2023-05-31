@@ -123,6 +123,7 @@ Responds with status code 200 on success.
   * `setField` *object* Perform a **set field command** (optional)
     * `field` *string* Field to set with dot path syntax
     * `value` *mixed* Value to set the field to
+    * `create` *boolean* Create the field (and intermediate path) if it doesn't exist (optional, defaults to false)
 
 #### Example request
 

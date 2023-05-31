@@ -83,7 +83,7 @@ func TestEndToEnd(t *testing.T) {
 			  "setField": {
 				"field": "spec.values.image.tag",
 				"value": "1.2.3",
-                "createKeys": true
+                "create": true
 			  }
 			}
 		  ]

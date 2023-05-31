@@ -94,8 +94,8 @@ type setFieldPatchRequestCommand struct {
 	Field string `json:"field"`
 	// Value to set
 	Value any `json:"value"`
-	// CreateKeys will create missing keys for field if they don't exist, if set to true
-	CreateKeys bool `json:"createKeys"`
+	// Create missing keys for field if they don't exist, if set to true
+	Create bool `json:"create"`
 }
 
 func (h *Handler) patch(w http.ResponseWriter, r *http.Request) {
@@ -299,7 +299,7 @@ func (h *Handler) applyPatchCommand(ctx context.Context, fs billy.Filesystem, cm
 
 	switch {
 	case cmd.SetField != nil:
-		err = patcher.SetField(strings.Split(cmd.SetField.Field, "."), cmd.SetField.Value, cmd.SetField.CreateKeys)
+		err = patcher.SetField(strings.Split(cmd.SetField.Field, "."), cmd.SetField.Value, cmd.SetField.Create)
 		if err != nil {
 			return fmt.Errorf("setting field %q: %w", cmd.SetField.Field, err)
 		}

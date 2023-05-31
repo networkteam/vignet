@@ -82,7 +82,8 @@ func TestEndToEnd(t *testing.T) {
 			  "path": "my-group/my-project/release.yml",
 			  "setField": {
 				"field": "spec.values.image.tag",
-				"value": "1.2.3"
+				"value": "1.2.3",
+                "createKeys": true
 			  }
 			}
 		  ]

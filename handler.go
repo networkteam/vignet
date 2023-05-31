@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -19,7 +20,8 @@ import (
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/networkteam/apexlogutils/httplog"
-	"sigs.k8s.io/kustomize/kyaml/yaml"
+
+	"github.com/networkteam/vignet/yaml"
 )
 
 type Handler struct {
@@ -92,6 +94,8 @@ type setFieldPatchRequestCommand struct {
 	Field string `json:"field"`
 	// Value to set
 	Value any `json:"value"`
+	// CreateKeys will create missing keys for field if they don't exist, if set to true
+	CreateKeys bool `json:"createKeys"`
 }
 
 func (h *Handler) patch(w http.ResponseWriter, r *http.Request) {
@@ -194,6 +198,8 @@ func (h *Handler) gitClonePatchCommitPush(ctx context.Context, repoName string, 
 	}
 
 	for _, cmd := range req.Commands {
+		// TODO Validate command (e.g. non-empty path)
+
 		err := h.applyPatchCommand(ctx, fs, cmd)
 		if err != nil {
 			return fmt.Errorf("applying patch command to %q: %w", cmd.Path, err)
@@ -275,73 +281,45 @@ func (h *Handler) buildCommitMsgAndOptions(ctx context.Context, req patchRequest
 }
 
 func (h *Handler) applyPatchCommand(ctx context.Context, fs billy.Filesystem, cmd patchRequestCommand) error {
-	var in []byte
-
-	// Read file content from path (in closure to use proper defer)
-	err := (func() error {
-		f, err := fs.Open(cmd.Path)
-		if err != nil {
-			return fmt.Errorf("opening file for reading: %w", err)
-		}
-		defer f.Close()
-
-		in, err = io.ReadAll(f)
-		if err != nil {
-			return fmt.Errorf("reading file: %w", err)
-		}
-		return nil
-	})()
+	f, err := fs.OpenFile(cmd.Path, os.O_RDWR, 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("opening file for reading: %w", err)
+	}
+	defer f.Close()
+
+	// If file is not a YAML file, we return an error (for now)
+	if !strings.HasSuffix(cmd.Path, ".yaml") && !strings.HasSuffix(cmd.Path, ".yml") {
+		return fmt.Errorf("unsupported file type: %q, only YAML is supported for now", cmd.Path)
 	}
 
-	res, err := yaml.Parse(string(in))
+	patcher, err := yaml.NewPatcher(f)
 	if err != nil {
-		return fmt.Errorf("parsing YAML: %w", err)
+		return fmt.Errorf("opening YAML for patching: %w", err)
 	}
 
 	switch {
 	case cmd.SetField != nil:
-		/*
-			FIXME This works only if the image tag is already present!
-			err = res.PipeE(
-				yaml.Lookup("spec", "values", "image", "tag"),
-				yaml.Set(yaml.NewStringRNode("1.2.3")),
-			)
-		*/
-
-		valueNode, err := convertMixedJsonValueToRNode(cmd.SetField.Value)
+		err = patcher.SetField(strings.Split(cmd.SetField.Field, "."), cmd.SetField.Value, cmd.SetField.CreateKeys)
 		if err != nil {
-			return fmt.Errorf("converting value to YAML node: %w", err)
-		}
-		err = res.SetMapField(valueNode, strings.Split(cmd.SetField.Field, ".")...)
-		if err != nil {
-			return fmt.Errorf("setting field: %w", err)
+			return fmt.Errorf("setting field %q: %w", cmd.SetField.Field, err)
 		}
 	default:
 		return fmt.Errorf("unknown command type")
 	}
 
-	err = (func() error {
-		f, err := fs.Create(cmd.Path)
-		if err != nil {
-			return fmt.Errorf("opening file for writing: %w", err)
-		}
-		defer f.Close()
-
-		out, err := res.String()
-		if err != nil {
-			return fmt.Errorf("serializing YAML: %w", err)
-		}
-
-		_, err = f.Write([]byte(out))
-		if err != nil {
-			return fmt.Errorf("writing file: %w", err)
-		}
-		return nil
-	})()
+	err = f.Truncate(0)
 	if err != nil {
-		return err
+		return fmt.Errorf("truncating file: %w", err)
+	}
+
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		return fmt.Errorf("seeking to start of file: %w", err)
+	}
+
+	err = patcher.Encode(f)
+	if err != nil {
+		return fmt.Errorf("encoding YAML: %w", err)
 	}
 
 	log.
@@ -349,18 +327,6 @@ func (h *Handler) applyPatchCommand(ctx context.Context, fs billy.Filesystem, cm
 		Info("Patched YAML")
 
 	return nil
-}
-
-func convertMixedJsonValueToRNode(value any) (*yaml.RNode, error) {
-	yml, err := yaml.Marshal(value)
-	if err != nil {
-		return nil, err
-	}
-	node, err := yaml.Parse(string(yml))
-	if err != nil {
-		return nil, err
-	}
-	return node, nil
 }
 
 func httpLogger(h http.Handler) http.Handler {

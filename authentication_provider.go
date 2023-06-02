@@ -48,12 +48,12 @@ func AuthenticateRequest(authenticationProvider AuthenticationProvider) func(htt
 			authCtx, err := authenticationProvider.AuthCtxFromRequest(r)
 			if err != nil {
 				log.WithError(err).Errorf("An internal error occurred while authenticating request with %T", authenticationProvider)
-				http.Error(w, "authentication failed", http.StatusInternalServerError)
+				http.Error(w, "Authentication failed", http.StatusInternalServerError)
 				return
 			}
 			if authCtx.Error != nil {
 				log.WithError(authCtx.Error).Warnf("Authentication failed for request with %T", authenticationProvider)
-				http.Error(w, "authentication failed", http.StatusUnauthorized)
+				http.Error(w, "Authentication failed", http.StatusUnauthorized)
 				return
 			}
 			ctx = ctxWithAuthCtx(ctx, authCtx)

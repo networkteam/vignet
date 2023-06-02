@@ -10,6 +10,7 @@ require (
 	github.com/go-git/go-git/v5 v5.6.1
 	github.com/gofrs/uuid v4.0.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.5.0
+	github.com/google/go-cmp v0.5.9
 	github.com/lestrrat-go/jwx/v2 v2.0.4
 	github.com/mattn/go-isatty v0.0.14
 	github.com/networkteam/apexlogutils v0.2.0

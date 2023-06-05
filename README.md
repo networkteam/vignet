@@ -124,8 +124,13 @@ Responds with status code 200 on success.
     * `field` *string* Field to set with dot path syntax
     * `value` *mixed* Value to set the field to
     * `create` *boolean* Create the field (and intermediate path) if it doesn't exist (optional, defaults to false)
+  * `createFile` *object* Perform a **create file command** to create a new file (optional)
+    * `content` *string* Content of the file to create
+  * `deleteFile` *object* Perform a **delete file command** to delete a file (optional)
 
-#### Example request
+#### Examples
+
+##### Setting a field in a YAML file
 
 ```http request
 POST http://localhost:8080/patch/infra-test
@@ -146,6 +151,74 @@ Content-Type: application/json
     }
   ]
 }
+```
+
+Using Curl is a convenient way to integrate Vignet into GitLab CI:
+
+```shell
+curl -s --fail-with-body -H "Authorization: Bearer $CI_JOB_JWT" -H "Content-Type: application/json" -d @- http://localhost:8080/patch/infra-test << JSON
+{
+  "commit": {
+    "message": "${CI_PROJECT_PATH}: Release ${CI_REGISTRY_TAG} to ${CI_ENVIRONMENT_SLUG}"
+  },
+  "commands": [
+    {
+      "path": "projects/${CI_PROJECT_PATH}/release-${CI_ENVIRONMENT_SLUG}.yaml",
+      "setField": {
+        "field": "spec.values.app.image.tag",
+        "value": "$CI_REGISTRY_TAG"
+      }
+    }
+  ]
+}
+JSON
+```
+
+##### Writing a new file
+
+```http request
+POST http://localhost:8080/patch/infra-test
+Authorization: Bearer [CI_JOB_JWT]
+Content-Type: application/json
+
+{
+  "commit": {
+    "message": "Bump image to 1.2.5"
+  },
+  "commands": [
+    {
+      "path": "my-group/my-project/new.yml",
+      "createField": {
+        "content": "---\nversion: 1.2.3\n"
+      }
+    }
+  ]
+}
+```
+
+Curl can be paired with `jq` to read an existing file and convert it to a JSON string:
+
+```shell
+# Prepare a YAML file for the new release before this command
+yaml_file=new-release.yml
+
+curl --fail-with-body -H "Authorization: Bearer $CI_JOB_JWT"  http://localhost:8080/patch/infra-test -H "Content-Type: application/json" -d \
+@<(jq -n --arg yaml "$(jq -sR . $yaml_file)" "$(cat <<JSON
+{
+  "commit": {
+    "message": "${CI_PROJECT_PATH}: Release ${CI_REGISTRY_TAG} to ${CI_ENVIRONMENT_SLUG}"
+  },
+  "commands": [
+    {
+      "path": "projects/${CI_PROJECT_PATH}/new-${CI_ENVIRONMENT_SLUG}.yaml",
+      "createFile": {
+        "content": \$yaml
+      }
+    }
+  ]
+}
+JSON
+)")
 ```
 
 ## Authentication

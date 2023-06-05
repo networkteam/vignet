@@ -133,6 +133,8 @@ type patchRequestCommand struct {
 	SetField *setFieldPatchRequestCommand `json:"setField"`
 	// CreateFile options are given, if the command should create a file
 	CreateFile *createFilePatchRequestCommand `json:"createFile"`
+	// DeleteFile options are given, if the command should delete a file
+	DeleteFile *deleteFilePatchRequestCommand `json:"deleteFile"`
 }
 
 func (c patchRequestCommand) Validate() error {
@@ -146,6 +148,9 @@ func (c patchRequestCommand) Validate() error {
 	}
 	if c.CreateFile != nil {
 		commandsSet = append(commandsSet, "'createFile'")
+	}
+	if c.DeleteFile != nil {
+		commandsSet = append(commandsSet, "'deleteFile'")
 	}
 	if len(commandsSet) == 0 {
 		return errors.New("no command is set")
@@ -197,6 +202,13 @@ type createFilePatchRequestCommand struct {
 }
 
 func (c createFilePatchRequestCommand) Validate() error {
+	return nil
+}
+
+type deleteFilePatchRequestCommand struct {
+}
+
+func (c deleteFilePatchRequestCommand) Validate() error {
 	return nil
 }
 
@@ -366,7 +378,7 @@ func (h *Handler) gitClonePatchCommitPush(ctx context.Context, repoName string, 
 			return fmt.Errorf("applying patch command to %q: %w", cmd.Path, err)
 		}
 
-		_, err = w.Add(cmd.Path)
+		err = w.AddWithOptions(&git.AddOptions{Path: cmd.Path})
 		if err != nil {
 			return fmt.Errorf("adding file to worktree: %w", err)
 		}
@@ -481,8 +493,12 @@ func (h *Handler) applyPatchCommand(ctx context.Context, fs billy.Filesystem, cm
 
 	switch {
 	case cmd.CreateFile != nil:
-		f, err := fs.Create(cmd.Path)
+		f, err := fs.OpenFile(cmd.Path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 		if err != nil {
+			// Check "file already exists" error
+			if os.IsExist(err) {
+				return clientError{errors.New("file already exists"), http.StatusUnprocessableEntity}
+			}
 			return fmt.Errorf("creating file: %w", err)
 		}
 		defer f.Close()
@@ -495,7 +511,7 @@ func (h *Handler) applyPatchCommand(ctx context.Context, fs billy.Filesystem, cm
 		f, err := fs.OpenFile(cmd.Path, os.O_RDWR, 0644)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return clientError{fmt.Errorf("file %s does not exist", cmd.Path), http.StatusUnprocessableEntity}
+				return clientError{errors.New("file does not exist"), http.StatusUnprocessableEntity}
 			}
 			return fmt.Errorf("opening file read-write: %w", err)
 		}
@@ -524,6 +540,14 @@ func (h *Handler) applyPatchCommand(ctx context.Context, fs billy.Filesystem, cm
 		err = patcher.Encode(f)
 		if err != nil {
 			return fmt.Errorf("writing YAML: %w", err)
+		}
+	case cmd.DeleteFile != nil:
+		err := fs.Remove(cmd.Path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return clientError{errors.New("file does not exist"), http.StatusUnprocessableEntity}
+			}
+			return err
 		}
 	default:
 		return clientError{fmt.Errorf("unknown command type"), http.StatusBadRequest}

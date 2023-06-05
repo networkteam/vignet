@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func TestEndToEnd(t *testing.T) {
 		patchPayload       string
 		expectedError      string
 		expectedStatus     int
-		expectedGitContent map[string]string
+		expectedGitContent map[string]fileExpectation
 		multipartFiles     map[string]string
 	}{
 		{
@@ -47,13 +48,13 @@ func TestEndToEnd(t *testing.T) {
 				  ]
 				}
 			`,
-			expectedGitContent: map[string]string{
-				"my-group/my-project/release.yml": `foo: bar
+			expectedGitContent: map[string]fileExpectation{
+				"my-group/my-project/release.yml": content{`foo: bar
 spec:
   values:
     image:
       tag: 1.2.3
-`,
+`},
 			},
 		},
 		{
@@ -75,6 +76,24 @@ spec:
 			expectedError:  `key "spec" not found`,
 		},
 		{
+			name: "invalid setField with non-existing file",
+			patchPayload: `
+				{
+				  "commands": [
+					{
+					  "path": "my-group/my-project/unknown.yml",
+					  "setField": {
+						"field": "spec.values.image.tag",
+						"value": "1.2.3"
+					  }
+					}
+				  ]
+				}
+			`,
+			expectedStatus: 422,
+			expectedError:  `file does not exist`,
+		},
+		{
 			name: "valid create",
 			patchPayload: `
 				{
@@ -88,13 +107,58 @@ spec:
 				  ]
 				}
 			`,
-			multipartFiles: map[string]string{
-				"file1": "---\nfoo: bar\n",
+			expectedGitContent: map[string]fileExpectation{
+				"my-group/my-project/release.yml": content{`foo: bar`},
+				"my-group/my-project/new.yml":     content{"---\nfoo: bar #Test\n"},
 			},
-			expectedGitContent: map[string]string{
-				"my-group/my-project/release.yml": `foo: bar`,
-				"my-group/my-project/new.yml":     "---\nfoo: bar #Test\n",
+		},
+		{
+			name: "invalid create with existing file",
+			patchPayload: `
+				{
+				  "commands": [
+					{
+					  "path": "my-group/my-project/release.yml",
+					  "createFile": {
+						"content": "---\nfoo: bar #Test\n"
+					  }
+					}
+				  ]
+				}
+			`,
+			expectedStatus: 422,
+			expectedError:  "file already exists",
+		},
+		{
+			name: "valid delete",
+			patchPayload: `
+				{
+				  "commands": [
+					{
+					  "path": "my-group/my-project/release.yml",
+					  "deleteFile": {}
+					}
+				  ]
+				}
+			`,
+			expectedGitContent: map[string]fileExpectation{
+				"my-group/my-project/release.yml": deleted{},
 			},
+		},
+		{
+			name: "invalid delete with non-existing file",
+			patchPayload: `
+				{
+				  "commands": [
+					{
+					  "path": "my-group/my-project/unknown.yml",
+					  "deleteFile": {}
+					}
+				  ]
+				}
+			`,
+			expectedStatus: 422,
+			expectedError:  "file does not exist",
 		},
 	}
 
@@ -113,6 +177,7 @@ spec:
 			fs := memfs.New()
 			initGitRepo(t, fs, map[string]string{
 				"my-group/my-project/release.yml": "foo: bar",
+				"other/file.yml":                  "version: 123",
 			})
 			// - Start mock HTTP Git server with basic auth
 			gitSrv := httptest.NewServer(newMockHttpGitServer(fs, mockHttpGitServerOpts{basicAuth: &gitHttp.BasicAuth{
@@ -179,6 +244,23 @@ spec:
 	}
 }
 
+// --- Helper types to have a nicer API to build the test cases
+
+type content struct{ string }
+
+func (c content) content() string { return c.string }
+func (content) isDeleted() bool   { return false }
+
+type deleted struct{}
+
+func (deleted) content() string { return "" }
+func (deleted) isDeleted() bool { return true }
+
+type fileExpectation interface {
+	content() string
+	isDeleted() bool
+}
+
 func assertGitRepoHeadCommit(t *testing.T, fs billy.Filesystem, expectedMessage string) {
 	t.Helper()
 
@@ -197,7 +279,7 @@ func assertGitRepoHeadCommit(t *testing.T, fs billy.Filesystem, expectedMessage 
 	require.Equal(t, expectedMessage, commit.Message)
 }
 
-func assertGitRepoContains(t *testing.T, fs billy.Filesystem, expectedFiles map[string]string) {
+func assertGitRepoContains(t *testing.T, fs billy.Filesystem, expectedFiles map[string]fileExpectation) {
 	t.Helper()
 
 	storer := filesystem.NewStorage(fs, cache.NewObjectLRUDefault())
@@ -216,15 +298,23 @@ func assertGitRepoContains(t *testing.T, fs billy.Filesystem, expectedFiles map[
 	require.NoError(t, err)
 
 	// Check files
-	for path, content := range expectedFiles {
-		f, err := workdirFS.Open(path)
-		require.NoError(t, err)
-		b, _ := io.ReadAll(f)
-		require.NoError(t, err)
-		f.Close()
+	for path, expectation := range expectedFiles {
 
-		// Assert content
-		require.Equal(t, content, string(b))
+		switch v := (expectation).(type) {
+		case content:
+			f, err := workdirFS.Open(path)
+			require.NoError(t, err)
+			b, _ := io.ReadAll(f)
+			require.NoError(t, err)
+			f.Close()
+
+			// Assert content
+			require.Equal(t, v.string, string(b))
+		case deleted:
+			_, err := workdirFS.Stat(path)
+			require.ErrorIs(t, err, os.ErrNotExist)
+		}
+
 	}
 }
 

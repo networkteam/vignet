@@ -73,7 +73,7 @@ spec:
 				}
 			`,
 			expectedStatus: 422,
-			expectedError:  `key "spec" not found`,
+			expectedError:  `no nodes matched path`,
 		},
 		{
 			name: "invalid setField with non-existing file",

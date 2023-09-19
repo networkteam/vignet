@@ -94,6 +94,50 @@ spec:
     tag: 0.2.0
 `,
 		},
+		{
+			name: "yaml with array index key",
+			inputYAML: `spec:
+  template:
+    spec:
+      containers:
+        - name: test
+          image: test.example.com:latest
+`,
+			fieldPath: "spec.template.spec.containers[0].image",
+			value:     "test.example.com:0.1.0",
+			expectedYAML: `spec:
+  template:
+    spec:
+      containers:
+        - name: test
+          image: test.example.com:0.1.0
+`,
+		},
+		{
+			name: "yaml with filter by name",
+			inputYAML: `spec:
+  template:
+    spec:
+      containers:
+        - env:
+            - name: FOO
+              value: '1'
+            - name: BAR
+              value: '2'
+`,
+			fieldPath: "spec.template.spec.containers[0].env[?(@.name=='BAR')].value",
+			value:     "3",
+			expectedYAML: `spec:
+  template:
+    spec:
+      containers:
+        - env:
+            - name: FOO
+              value: '1'
+            - name: BAR
+              value: "3"
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -101,7 +145,7 @@ spec:
 			patcher, err := yaml.NewPatcher(strings.NewReader(tt.inputYAML))
 			require.NoError(t, err)
 
-			err = patcher.SetField(strings.Split(tt.fieldPath, "."), tt.value, tt.createKeys)
+			err = patcher.SetField(tt.fieldPath, tt.value, tt.createKeys)
 			if tt.expectErr {
 				assert.Error(t, err)
 				return

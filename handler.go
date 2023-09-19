@@ -174,11 +174,12 @@ func (c patchRequestCommand) Validate() error {
 }
 
 type setFieldPatchRequestCommand struct {
-	// Field path to set (dot separated)
+	// Field path to set (in YAMLPath syntax).
 	Field string `json:"field"`
-	// Value to set
+	// Value to set.
 	Value any `json:"value"`
-	// Create missing keys for field if they don't exist, if set to true
+	// Create missing keys for field if they don't exist, if set to true.
+	// Field must be a simple dot separated path then - JSONPath is not supported.
 	Create bool `json:"create"`
 }
 
@@ -522,7 +523,7 @@ func (h *Handler) applyPatchCommand(ctx context.Context, fs billy.Filesystem, cm
 			return fmt.Errorf("reading YAML: %w", err)
 		}
 
-		err = patcher.SetField(strings.Split(cmd.SetField.Field, "."), cmd.SetField.Value, cmd.SetField.Create)
+		err = patcher.SetField(cmd.SetField.Field, cmd.SetField.Value, cmd.SetField.Create)
 		if err != nil {
 			return clientError{fmt.Errorf("setting field %q: %w", cmd.SetField.Field, err), http.StatusUnprocessableEntity}
 		}

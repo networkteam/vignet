@@ -1,9 +1,12 @@
 package yaml
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"strings"
 
+	"github.com/vmware-labs/yaml-jsonpath/pkg/yamlpath"
 	goyaml "gopkg.in/yaml.v3"
 )
 
@@ -23,10 +26,38 @@ func NewPatcher(r io.Reader) (*Patcher, error) {
 	}, nil
 }
 
-func (p *Patcher) SetField(path []string, value any, createKeys bool) error {
-	valueNode, err := recurseNodeByPath(p.node, path, createKeys)
+func (p *Patcher) SetField(path string, value any, createKeys bool) error {
+	parsedPath, err := yamlpath.NewPath(path)
 	if err != nil {
-		return fmt.Errorf("retrieving node by path: %w", err)
+		return fmt.Errorf("parsing path: %w", err)
+	}
+
+	matchedNodes, err := parsedPath.Find(p.node)
+	if err != nil {
+		return fmt.Errorf("finding value node: %w", err)
+	}
+
+	var valueNode *goyaml.Node
+
+	if len(matchedNodes) == 0 {
+		if createKeys {
+			pathParts := strings.Split(path, ".")
+			// Note: we do not support JSONPath expressions in the path if createKeys is executed!
+			valueNode, err = recurseNodeByPath(p.node, pathParts, true)
+			if err != nil {
+				return fmt.Errorf("creating path: %w", err)
+			}
+		} else {
+			return errors.New("no nodes matched path")
+		}
+	} else if len(matchedNodes) > 1 {
+		return errors.New("multiple nodes matched path")
+	} else {
+		valueNode = matchedNodes[0]
+	}
+
+	if valueNode.Kind != goyaml.ScalarNode {
+		return fmt.Errorf("expected scalar node, got %s (at %d:%d)", kindToStr(valueNode.Kind), valueNode.Line, valueNode.Column)
 	}
 
 	err = valueNode.Encode(value)
@@ -79,7 +110,8 @@ func handleScalarNode(node *goyaml.Node) (*goyaml.Node, error) {
 
 func handleMappingNode(node *goyaml.Node, path []string, createKeys bool) (*goyaml.Node, error) {
 	for i := 0; i < len(node.Content); i += 2 {
-		if node.Content[i].Value == path[0] {
+		key := node.Content[i].Value
+		if key == path[0] {
 			return recurseNodeByPath(node.Content[i+1], path[1:], createKeys)
 		}
 	}

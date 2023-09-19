@@ -121,7 +121,7 @@ Responds with status code 200 on success.
 * `commands` *array* Commands to perform, one of `setField` and `n.n.` must be set
   * `path` *string* Path to the file to patch (relative from repository root)
   * `setField` *object* Perform a **set field command** (optional)
-    * `field` *string* Field to set with dot path syntax
+    * `field` *string* Field to set with dot path syntax, JSONPath features are supported (see examples)
     * `value` *mixed* Value to set the field to
     * `create` *boolean* Create the field (and intermediate path) if it doesn't exist (optional, defaults to false)
   * `createFile` *object* Perform a **create file command** to create a new file (optional)
@@ -147,6 +147,35 @@ Content-Type: application/json
       "setField": {
         "field": "spec.values.image.tag",
         "value": "1.2.5"
+      }
+    }
+  ]
+}
+```
+
+##### Using JSONPath
+
+[JSONPath](https://github.com/vmware-labs/yaml-jsonpath#references) can be used to reference a field by array index, filter expression or other features:
+
+```http request
+POST http://localhost:8080/patch/infra-test
+Authorization: Bearer [CI_JOB_JWT]
+Content-Type: application/json
+
+{
+  "commit": {
+    "message": "Bump image to 1.2.5, update BUILD_ID"
+  },
+  "commands": [
+    {
+      "path": "my-group/my-project/deployment.yml",
+      "setField": {
+        "field": "spec.template.spec.containers[0].image",
+        "value": "registry.example.com/my/image:1.2.5"
+      },
+      "setField": {
+        "field": "spec.template.spec.containers[0].env[?(@.name == 'BUILD_ID')].value",
+        "value": "987654"
       }
     }
   ]
@@ -188,7 +217,7 @@ Content-Type: application/json
   "commands": [
     {
       "path": "my-group/my-project/new.yml",
-      "createField": {
+      "createFile": {
         "content": "---\nversion: 1.2.3\n"
       }
     }

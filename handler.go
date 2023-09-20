@@ -179,7 +179,7 @@ type setFieldPatchRequestCommand struct {
 	// Value to set.
 	Value any `json:"value"`
 	// Create missing keys for field if they don't exist, if set to true.
-	// Field must be a simple dot separated path then - JSONPath is not supported.
+	// Note that Field must be a simple dot separated path in this case - JSONPath is not supported.
 	Create bool `json:"create"`
 }
 
@@ -189,8 +189,8 @@ func (c setFieldPatchRequestCommand) Validate() error {
 	if c.Field == "" {
 		return fmt.Errorf("field must not be empty")
 	}
-	// Validate Field is a valid path of YAML keys
-	if !yamlPathPattern.MatchString(c.Field) {
+	// Validate Field is a dot separated path if create is set
+	if c.Create && !yamlPathPattern.MatchString(c.Field) {
 		return fmt.Errorf("field must be a valid path of dot separated YAML keys")
 	}
 

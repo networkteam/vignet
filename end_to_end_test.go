@@ -58,6 +58,41 @@ spec:
 			},
 		},
 		{
+			name: "valid multiple setField with JSONPath",
+			patchPayload: `
+				{
+				  "commands": [
+					{
+					  "path": "my-group/my-project/deployment.yml",
+					  "setField": {
+						"field": "spec.template.spec.containers[0].image",
+						"value": "test.example.com:0.2.0"
+					  }
+					},
+					{
+					  "path": "my-group/my-project/deployment.yml",
+					  "setField": {
+						"field": "spec.template.spec.containers[0].env[?(@.name == 'BUILD_ID')].value",
+						"value": "42"
+					  }
+					}
+				  ]
+				}
+			`,
+			expectedGitContent: map[string]fileExpectation{
+				"my-group/my-project/deployment.yml": content{`spec:
+  template:
+    spec:
+      containers:
+        - name: test
+          image: test.example.com:0.2.0
+          env:
+            - name: BUILD_ID
+              value: "42"
+`},
+			},
+		},
+		{
 			name: "invalid setField with new key and no create",
 			patchPayload: `
 				{
@@ -178,6 +213,16 @@ spec:
 			initGitRepo(t, fs, map[string]string{
 				"my-group/my-project/release.yml": "foo: bar",
 				"other/file.yml":                  "version: 123",
+				"my-group/my-project/deployment.yml": `spec:
+  template:
+    spec:
+      containers:
+        - name: test
+          image: test.example.com:0.1.0
+          env:
+            - name: BUILD_ID
+              value: '1'
+`,
 			})
 			// - Start mock HTTP Git server with basic auth
 			gitSrv := httptest.NewServer(newMockHttpGitServer(fs, mockHttpGitServerOpts{basicAuth: &gitHttp.BasicAuth{

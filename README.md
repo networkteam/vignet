@@ -172,7 +172,10 @@ Content-Type: application/json
       "setField": {
         "field": "spec.template.spec.containers[0].image",
         "value": "registry.example.com/my/image:1.2.5"
-      },
+      }
+    },
+    {
+      "path": "my-group/my-project/deployment.yml",
       "setField": {
         "field": "spec.template.spec.containers[0].env[?(@.name == 'BUILD_ID')].value",
         "value": "987654"

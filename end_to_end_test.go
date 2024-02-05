@@ -88,7 +88,7 @@ spec:
           image: test.example.com:0.2.0
           env:
             - name: BUILD_ID
-              value: "42"
+              value: '42'
 `},
 			},
 		},

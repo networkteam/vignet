@@ -60,10 +60,15 @@ func (p *Patcher) SetField(path string, value any, createKeys bool) error {
 		return fmt.Errorf("expected scalar node, got %s (at %d:%d)", kindToStr(valueNode.Kind), valueNode.Line, valueNode.Column)
 	}
 
-	err = valueNode.Encode(value)
+	newNode := new(goyaml.Node)
+	newNode.Kind = goyaml.ScalarNode
+	err = newNode.Encode(value)
 	if err != nil {
 		return fmt.Errorf("encoding value: %w", err)
 	}
+
+	valueNode.Value = newNode.Value
+	valueNode.Tag = newNode.Tag
 
 	return nil
 }

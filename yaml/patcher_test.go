@@ -39,6 +39,22 @@ spec:
 `,
 		},
 		{
+			name: "valid yaml with nested key and comment as annotation on same line",
+			inputYAML: `
+foo: bar
+spec:
+  image:
+    tag: 0.1.0 # {"$imagepolicy": "foo:bar:tag"}
+`,
+			fieldPath: "spec.image.tag",
+			value:     "0.2.0",
+			expectedYAML: `foo: bar
+spec:
+  image:
+    tag: 0.2.0 # {"$imagepolicy": "foo:bar:tag"}
+`,
+		},
+		{
 			name: "yaml with non-leaf key",
 			inputYAML: `
 spec:
@@ -135,7 +151,70 @@ spec:
             - name: FOO
               value: '1'
             - name: BAR
-              value: "3"
+              value: '3'
+`,
+		},
+		// Test various conversion of an existing value
+		{
+			name: "setting multi-line strings",
+			inputYAML: `
+foo: bar
+`,
+			fieldPath: "foo",
+			value:     "A longer string\nwith a newline",
+			expectedYAML: `foo: |-
+  A longer string
+  with a newline
+`,
+		},
+		{
+			name: "setting unquoted string to quoted",
+			inputYAML: `
+foo: bar
+`,
+			fieldPath: "foo",
+			value:     "!better quote this",
+			expectedYAML: `foo: '!better quote this'
+`,
+		},
+		{
+			name: "setting string in single quote is escaped correctly",
+			inputYAML: `
+foo: 'double quote this'
+`,
+			fieldPath: "foo",
+			value:     "single's quote",
+			expectedYAML: `foo: 'single''s quote'
+`,
+		},
+		{
+			name: "setting string to bool",
+			inputYAML: `
+foo: bar
+`,
+			fieldPath: "foo",
+			value:     true,
+			expectedYAML: `foo: true
+`,
+		},
+		{
+			name: "setting string to int",
+			inputYAML: `
+foo: bar
+`,
+			fieldPath: "foo",
+			value:     42,
+			expectedYAML: `foo: 42
+`,
+		},
+		{
+			name: "setting string to null",
+			inputYAML: `
+foo: bar
+`,
+			fieldPath: "foo",
+			value:     nil,
+			expectedYAML: `foo: null
 `,
 		},
 	}
